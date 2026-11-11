@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en" data-theme="auto">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Proxmark3 Web Client — Security Audit</title>
+<meta name="description" content="Data-exfiltration, backdoor and reverse-tunnel audit of the Proxmark3 Web Client (ahzs645/proxmark3-web-client).">
+<style>
+  :root{
+    --bg:#f6f7f9; --panel:#ffffff; --ink:#11161d; --muted:#5a6675; --line:#e3e7ec;
+    --accent:#1f6feb; --ok:#1a7f52; --okbg:#e7f6ee; --warn:#9a6a00; --warnbg:#fbf1dc;
+    --code:#f0f2f5; --chip:#eef1f5; --shadow:0 1px 2px rgba(16,24,40,.06),0 8px 24px rgba(16,24,40,.06);
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --bg:#0d1117; --panel:#161b22; --ink:#e6edf3; --muted:#9aa7b4; --line:#273041;
+      --accent:#5a9bff; --ok:#56d396; --okbg:#10291f; --warn:#e3b341; --warnbg:#2a2310;
+      --code:#1b2230; --chip:#1e2634; --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0d1117; --panel:#161b22; --ink:#e6edf3; --muted:#9aa7b4; --line:#273041;
+    --accent:#5a9bff; --ok:#56d396; --okbg:#10291f; --warn:#e3b341; --warnbg:#2a2310;
+    --code:#1b2230; --chip:#1e2634; --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font:16px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  .wrap{max-width:860px; margin:0 auto; padding:40px 16px 96px}
+  header.doc{margin-bottom:28px}
+  .eyebrow{font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); font-weight:600}
+  h1{font-size:clamp(24px,5vw,34px); line-height:1.15; margin:.25em 0 .35em; letter-spacing:-.01em}
+  .meta{color:var(--muted); font-size:14px}
+  .meta code{background:var(--code); padding:1px 6px; border-radius:5px; font-size:.92em}
+  .verdict{
+    display:flex; gap:14px; align-items:flex-start; margin:22px 0 8px;
+    background:var(--okbg); border:1px solid color-mix(in srgb,var(--ok) 35%,transparent);
+    border-radius:14px; padding:18px 20px;
+  }
+  .verdict .dot{flex:0 0 auto; width:12px; height:12px; border-radius:50%; background:var(--ok); margin-top:7px; box-shadow:0 0 0 4px color-mix(in srgb,var(--ok) 22%,transparent)}
+  .verdict b{color:var(--ok)}
+  .verdict p{margin:0; font-size:15px}
+  h2{font-size:20px; margin:40px 0 12px; letter-spacing:-.01em}
+  h2 .n{color:var(--muted); font-weight:600; margin-right:8px}
+  h3{font-size:15px; margin:22px 0 8px}
+  p{margin:0 0 14px}
+  a{color:var(--accent); text-decoration:none}
+  a:hover{text-decoration:underline}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px 22px; box-shadow:var(--shadow); margin:16px 0}
+  ul.checks{list-style:none; margin:0; padding:0}
+  ul.checks li{position:relative; padding:7px 0 7px 30px; border-bottom:1px solid var(--line)}
+  ul.checks li:last-child{border-bottom:0}
+  ul.checks li::before{content:"✓"; position:absolute; left:2px; top:7px; color:var(--ok); font-weight:700}
+  ul.checks b{font-weight:600}
+  code,kbd{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  :not(pre)>code{background:var(--code); padding:1.5px 6px; border-radius:5px; font-size:.9em; overflow-wrap:anywhere}
+  .table-scroll{overflow-x:auto; -webkit-overflow-scrolling:touch; margin:14px 0; border:1px solid var(--line); border-radius:12px}
+  table{border-collapse:collapse; width:100%; min-width:520px; font-size:14px}
+  th,td{text-align:left; padding:11px 14px; border-bottom:1px solid var(--line); vertical-align:top}
+  th{background:var(--chip); font-size:12px; letter-spacing:.04em; text-transform:uppercase; color:var(--muted)}
+  tr:last-child td{border-bottom:0}
+  td code{font-size:.85em}
+  .pill{display:inline-block; font-size:11px; font-weight:600; letter-spacing:.03em; padding:2px 9px; border-radius:999px; white-space:nowrap}
+  .pill.block{background:var(--okbg); color:var(--ok); border:1px solid color-mix(in srgb,var(--ok) 35%,transparent)}
+  .pill.local{background:var(--chip); color:var(--muted); border:1px solid var(--line)}
+  .note{background:var(--warnbg); border:1px solid color-mix(in srgb,var(--warn) 40%,transparent); border-radius:12px; padding:16px 18px; margin:16px 0}
+  .note b{color:var(--warn)}
+  .scope li{margin:6px 0}
+  footer.doc{margin-top:48px; padding-top:18px; border-top:1px solid var(--line); color:var(--muted); font-size:13px}
+  .kv{display:grid; grid-template-columns:auto 1fr; gap:4px 16px; font-size:14px}
+  .kv dt{color:var(--muted)}
+  .kv dd{margin:0; overflow-wrap:anywhere}
+  @media(max-width:560px){ .kv{grid-template-columns:1fr} .kv dt{margin-top:8px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="doc">
+    <div class="eyebrow">Security Review</div>
+    <h1>Proxmark3 Web Client — Data-Exfiltration &amp; Backdoor Audit</h1>
+    <p class="meta">
+      Target: <code>ahzs645/proxmark3-web-client</code> @ <code>1ebd502</code> ·
+      bundled WASM client <code>v4.23346-256-g4ff716a69</code> ·
+      audited 2026-11-11
+    </p>
+  </header>
+
+  <div class="verdict">
+    <span class="dot" aria-hidden="true"></span>
+    <p><b>Verdict — no exfiltration, backdoor, or reverse tunnel.</b> The application is a legitimate
+    Proxmark client. Nothing sends card or device data off the machine, nothing listens for inbound
+    connections, and nothing tunnels. It communicates only with the local device (Web Serial / WebUSB /
+    Web&nbsp;Bluetooth) and browser-local storage. Three optional <em>download-only</em> features reach
+    fixed remote hosts; all are already blocked by the deployment's Content-Security-Policy.</p>
+  </div>
+
+  <h2><span class="n">01</span>Threat model &amp; scope</h2>
+  <div class="card">
+    <p>The expectation under review: once the page has loaded, it should communicate only with
+      <b>(a)</b> the local filesystem / browser storage for saving data, and <b>(b)</b> a local Proxmark
+      device over USB or BLE. The audit hunted for anything that exfiltrates data, grants backdoor
+      access, or creates a reverse tunnel / outbound channel to a remote host.</p>
+    <p style="margin-bottom:0">What was reviewed, in the self-built and sandbox-deployed instance:</p>
+    <ul class="checks" style="margin-top:8px">
+      <li>The application <b>source</b> (TypeScript/React) and the <b>built JS bundle</b> actually served to the browser — the ground truth of what runs.</li>
+      <li>The <b>service worker</b> (<code>coi-serviceworker.js</code>) and the <b>Emscripten/WASM glue</b> (<code>proxmark3.js</code>).</li>
+      <li>All <b>transports</b> (Web Serial, Web Bluetooth, and the desktop-only Tauri serial/BLE/TCP), <b>dependencies</b>, and the <b>Tauri Rust backend</b>.</li>
+    </ul>
+  </div>
+
+  <h2><span class="n">02</span>What proved it clean</h2>
+  <div class="card">
+    <ul class="checks">
+      <li><b>No exfiltration primitives</b> in source or bundle: no <code>sendBeacon</code>, no remote
+        <code>WebSocket</code>/<code>RTCPeerConnection</code>, no <code>EventSource</code>, no data
+        <code>POST</code>, no <code>document.cookie</code>, no <code>&lt;a ping&gt;</code>, no image-ping.</li>
+      <li><b>No dynamic remote code</b>: no <code>eval</code>/<code>new Function</code> over remote data,
+        no injected remote <code>&lt;script&gt;</code>, no remote <code>import()</code>.</li>
+      <li><b>No telemetry or analytics</b>: 39 dependencies, zero tracking / crash-reporting packages,
+        and no <code>postinstall</code> scripts.</li>
+      <li><b>Service worker is clean</b>: a same-origin offline cache plus cross-origin-isolation
+        (COOP/COEP) headers. It strips credentials and never contacts an external host.</li>
+      <li><b>WASM glue</b> carries only dormant Emscripten POSIX-socket shims and no hardcoded remote
+        URLs; the JS never drives them to a remote address.</li>
+      <li><b>Web Bluetooth</b> is <code>filters</code>-scoped to the Proxmark BLE UART service
+        (<code>0xAE86</code>) behind a user device-picker — no <code>acceptAllDevices</code> scanning.</li>
+      <li><b>Storage is local only</b>: <code>localStorage</code>, <code>sessionStorage</code>,
+        IndexedDB and the Cache API — no network persistence.</li>
+      <li><b>Stray external strings</b> (<code>tinyurl.com</code>, <code>bit.ly</code>,
+        <code>react.dev</code>) are third-party library warning-message text, not fetch targets.</li>
+    </ul>
+  </div>
+
+  <h2><span class="n">03</span>The only deviation from "strictly local" — three download features</h2>
+  <p>Each contacts a fixed, pinned host to <b>download</b> (never upload): no card or user data appears in
+    the requests. All three are <b>blocked by the deployment CSP</b>
+    <code>connect-src 'self' blob: data:</code>, so they fail closed and the app degrades gracefully.</p>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr><th>Feature</th><th>Host</th><th>Trigger</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><b>Firmware updater</b><br><code>firmware/api.ts</code></td>
+          <td><code>https://proxmark3.app</code></td>
+          <td>When the firmware panel (Settings) mounts. GET manifest + <code>.elf</code>, SHA-256 verified; hardened so a manifest cannot redirect to another host.</td>
+          <td><span class="pill block">CSP-blocked</span></td>
+        </tr>
+        <tr>
+          <td><b>Optional "extras" dictionaries</b><br><code>pm3Resources.ts</code></td>
+          <td><code>raw.githubusercontent.com/ahzs645/proxmark3wasm/&lt;commit&gt;/client/</code></td>
+          <td>When a command references a large dictionary not in the bundle. The URL comes from the bundled manifest — <b>not</b> from the device/card — so a rogue device cannot redirect it.</td>
+          <td><span class="pill block">CSP-blocked</span></td>
+        </tr>
+        <tr>
+          <td><b>pm3-resources bundle</b><br><code>pm3Resources.ts</code></td>
+          <td>same-origin (relative path)</td>
+          <td>On load — the app's own server.</td>
+          <td><span class="pill local">Local</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p style="color:var(--muted);font-size:14px">In the hardened deployment these appear as CSP-blocked
+    console errors — the correct, safe outcome. Neither carries any data outward; both are GET downloads.</p>
+
+  <h2><span class="n">04</span>Tauri desktop backend</h2>
+  <div class="card">
+    <p style="margin-bottom:10px">Not used in the browser flow, but reviewed in full (every Rust file,
+      <code>Cargo.toml</code>, <code>Cargo.lock</code>, <code>tauri.conf.json</code>, capabilities):</p>
+    <ul class="checks">
+      <li><b>One</b> network operation: a single outbound <code>TcpStream::connect</code> to a
+        <em>user-supplied</em> address (the Proxmark5 Wi-Fi module). No <code>bind</code>/<code>listen</code> anywhere — no server, no inbound channel.</li>
+      <li>Shell-outs launch only an <b>installed</b> local <code>proxmark3</code> client or hardcoded
+        BT helpers; the PM3 command goes as a single <code>-c</code> argument — no shell injection.</li>
+      <li>No updater, no HTTP plugin, no telemetry; capabilities grant only <code>core:default</code>;
+        CSP restricts the web layer to self + localhost.</li>
+    </ul>
+    <div class="note" style="margin-bottom:0">
+      <b>Hardening note (desktop only).</b> The <code>tcp_connect</code> command has no destination
+      allowlist, so a compromised frontend could use it as a generic outbound socket. Irrelevant to the
+      browser deployment; consider restricting it to loopback / RFC&nbsp;1918 for defense in depth.
+    </div>
+  </div>
+
+  <h2><span class="n">05</span>Scope limits (stated honestly)</h2>
+  <div class="card scope">
+    <ul>
+      <li><b>The 16&nbsp;MB <code>proxmark3.wasm</code> binary was not disassembled.</b> It does not need
+        blind trust: in a browser, WASM has <b>no ambient network access</b> — it can only reach the
+        network through JS bindings the page provides (here: the Serial/Bluetooth bridges plus the fetch
+        for its own <code>.wasm</code>), and the CSP <code>connect-src 'self'</code> would block any
+        socket or WebSocket it attempted to open to a remote host. It is network-confined by the browser
+        and the CSP regardless of its contents.</li>
+      <li><b>This covers the pinned commit built and deployed here.</b> The publicly hosted copy at
+        <code>projects.ahmadjalil.com</code> is a different deployment that was not audited and would
+        <b>not</b> carry this CSP. The self-built, sandboxed, CSP-locked instance is the one to trust.</li>
+    </ul>
+  </div>
+
+  <h2><span class="n">06</span>Recommendation</h2>
+  <div class="card">
+    <p style="margin-bottom:0"><b>Safe to use as deployed.</b> The no-network server sandbox plus the
+      Content-Security-Policy already deny every outbound path identified, so even the benign download
+      features cannot phone anywhere. No code changes are required for the browser deployment. Optional:
+      add a loopback/LAN allowlist to the desktop <code>tcp_connect</code> if the Tauri build is ever used.</p>
+  </div>
+
+  <footer class="doc">
+    <dl class="kv">
+      <dt>Deployment CSP</dt><dd><code>default-src 'none'; connect-src 'self' blob: data:; script-src 'self' 'wasm-unsafe-eval'; …</code></dd>
+      <dt>Server isolation</dt><dd>static file server in a <code>bwrap</code> network namespace with only a loopback interface (no routes); reachable on <code>127.0.0.1:8080</code> via a loopback-only bridge.</dd>
+      <dt>Method</dt><dd>static review of source, built bundle, service worker and WASM glue; dependency &amp; transport inspection; full read of the Tauri Rust backend. No dynamic/runtime network capture was performed.</dd>
+    </dl>
+    <p style="margin:14px 0 0">Prepared with Claude Code. This report reflects the state of the audited commit on the date shown; re-audit after updating the client or firmware.</p>
+  </footer>
+
+</div>
+</body>
+</html>
