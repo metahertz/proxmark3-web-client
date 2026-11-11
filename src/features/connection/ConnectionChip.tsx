@@ -1,6 +1,7 @@
 import { Check, CircleDashed, Loader2, TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useServiceWorkerVersion } from "@/hooks/useServiceWorkerVersion";
 import type { ConnectionState, ConnectionTone, StageState } from "./model";
 
 const TONE_DOT: Record<ConnectionTone, string> = {
@@ -37,6 +38,7 @@ interface ConnectionChipProps {
  * single, honest answer instead of four badges that disagree.
  */
 export function ConnectionChip({ connection, compact = false, className }: ConnectionChipProps) {
+  const swVersion = useServiceWorkerVersion();
   return (
     <TooltipProvider delayDuration={200}>
       <Tooltip>
@@ -68,6 +70,10 @@ export function ConnectionChip({ connection, compact = false, className }: Conne
               </li>
             ))}
           </ul>
+          <p className="border-t border-border pt-2 text-[11px] text-muted-foreground">
+            Service worker{" "}
+            <span className="font-medium text-foreground">{swVersion ?? "not active"}</span>
+          </p>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>

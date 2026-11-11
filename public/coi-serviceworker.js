@@ -7,7 +7,7 @@
  */
 
 const CACHE_PREFIX = "proxmark3-web-client";
-const CACHE_VERSION = "v2";
+const CACHE_VERSION = "v5";
 const CACHE_NAME = `${CACHE_PREFIX}-${CACHE_VERSION}`;
 const APP_SHELL = [
   "./",
@@ -126,6 +126,9 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("message", (event) => {
   if (event.data?.type === "SKIP_WAITING") void self.skipWaiting();
+  if (event.data?.type === "GET_VERSION") {
+    event.ports[0]?.postMessage({ version: CACHE_VERSION });
+  }
 });
 
 self.addEventListener("fetch", (event) => {
