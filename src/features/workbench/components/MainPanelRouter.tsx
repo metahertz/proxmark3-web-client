@@ -49,6 +49,9 @@ const UtilitiesPanel = lazy(() =>
 const Type2NdefPanel = lazy(() =>
   import("@/components/panels/Type2NdefPanel").then((m) => ({ default: m.Type2NdefPanel })),
 );
+const EmvPanel = lazy(() =>
+  import("@/components/panels/EmvPanel").then((m) => ({ default: m.EmvPanel })),
+);
 const DeviceProfilePanel = lazy(() =>
   import("@/components/panels/DeviceProfilePanel").then((m) => ({
     default: m.DeviceProfilePanel,
@@ -239,6 +242,14 @@ export function MainPanelRouter({
       <div className="flex-1 p-4 overflow-hidden">
         <div className="h-full w-full">
           <T55xxPanel onCommand={onCommand} disabled={!canRunCommands} />
+        </div>
+      </div>
+    );
+  } else if (activeWorkspace === "emv") {
+    panel = (
+      <div className="flex-1 p-4 overflow-hidden">
+        <div className="h-full w-full">
+          <EmvPanel onCommand={onCommand} disabled={!canRunCommands} />
         </div>
       </div>
     );

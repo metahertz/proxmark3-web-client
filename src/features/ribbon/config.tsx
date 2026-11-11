@@ -179,6 +179,14 @@ export const WORKSPACES: WorkspaceDefinition[] = [
     hint: "Sniff and replay reader / card traffic",
     strips: ["traffic", "hf"],
   },
+  {
+    value: "emv",
+    label: "EMV / Payment",
+    icon: "creditCard",
+    group: "High Frequency",
+    hint: "Read contactless payment cards: identify, enumerate apps, run a transaction, ROCA test",
+    strips: ["hf", "data"],
+  },
 
   {
     value: "lfops",
@@ -305,6 +313,7 @@ export const HF_CARD_TYPES: RibbonCardType[] = [
   { value: "mfultralight", label: "MIFARE Ultralight" },
   { value: "iclass", label: "iClass" },
   { value: "desfire", label: "DESFire" },
+  { value: "emv", label: "EMV / Payment" },
   { value: "attacks", label: "Attacks" },
 ];
 
@@ -361,6 +370,13 @@ export const HF_CARD_OPERATIONS: Record<string, RibbonAction[]> = {
     { icon: "creditCard", label: "Info", command: "hf mfdes info" },
     { icon: "book", label: "List Apps", command: "hf mfdes lsapp" },
     { icon: "key", label: "Auth", command: "hf mfdes auth" },
+  ],
+  emv: [
+    { icon: "creditCard", label: "Read", command: "emv reader -v" },
+    { icon: "search", label: "Apps", command: "emv search -s -t" },
+    { icon: "play", label: "Transaction", command: "emv exec -s -j -t --qvsdc" },
+    { icon: "download", label: "Scan JSON", command: "emv scan -e -j -t emv_scan.json" },
+    { icon: "shield", label: "ROCA", command: "emv roca" },
   ],
   attacks: [
     {

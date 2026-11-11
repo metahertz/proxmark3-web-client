@@ -2,7 +2,7 @@ import { Badge, type BadgeProps } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Bolt, Cable, Database, Radio, ShieldHalf, Wifi } from "lucide-react";
+import { Bolt, Cable, CreditCard, Database, Radio, ShieldHalf, Wifi } from "lucide-react";
 
 type CommandItem = {
   label: string;
@@ -78,6 +78,33 @@ const sections: Record<string, CommandItem[]> = {
       description: "Backup Ultralight EV1 with default key",
     },
   ],
+  "EMV / Payment": [
+    {
+      label: "Read Card",
+      command: "emv reader -v",
+      description: "Identify a contactless payment card and decode its logs",
+    },
+    {
+      label: "List Applications",
+      command: "emv search -s -t",
+      description: "Enumerate payment applets (Visa, Mastercard, Amex…)",
+    },
+    {
+      label: "Run Transaction",
+      command: "emv exec -s -j -t --qvsdc",
+      description: "Full qVSDC/M-Chip read with default terminal params",
+    },
+    {
+      label: "Scan to JSON",
+      command: "emv scan -e -j -t emv_scan.json",
+      description: "Dump card contents to an emulator-ready JSON file",
+    },
+    {
+      label: "ROCA Test",
+      command: "emv roca",
+      description: "Check the card's RSA keys for the ROCA weakness",
+    },
+  ],
   "LF & Wiegand": [
     {
       label: "LF Search",
@@ -128,6 +155,7 @@ const sectionIcons: Record<string, React.ReactNode> = {
   "HF Recon": <Radio className="h-4 w-4" />,
   "MIFARE Ops": <Bolt className="h-4 w-4" />,
   "iCLASS & Ultralight": <ShieldHalf className="h-4 w-4" />,
+  "EMV / Payment": <CreditCard className="h-4 w-4" />,
   "LF & Wiegand": <Wifi className="h-4 w-4" />,
   "Data & Scripts": <Database className="h-4 w-4" />,
 };
@@ -136,6 +164,7 @@ const accentBadges: Record<string, BadgeProps["variant"]> = {
   "HF Recon": "outline",
   "MIFARE Ops": "success",
   "iCLASS & Ultralight": "default",
+  "EMV / Payment": "default",
   "LF & Wiegand": "warning",
   "Data & Scripts": "secondary",
 };
