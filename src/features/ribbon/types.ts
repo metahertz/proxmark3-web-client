@@ -2,7 +2,7 @@ import type { ConnectionState } from "@/features/connection/model";
 import type { Theme } from "@/hooks/useTheme";
 import type { TransportInfo, TransportType } from "@/lib/transports";
 import type { RibbonStripId } from "./config";
-import type { LibraryKeyMode } from "@/features/keys/libraryKeyCommands";
+import type { LibraryKeyMode, LibraryKeySource } from "@/features/keys/libraryKeyCommands";
 
 export type ConnectionStatus = "disconnected" | "connecting" | "connected" | "error";
 
@@ -14,6 +14,10 @@ export interface RibbonToolbarProps {
   onCommand: (cmd: string) => void;
   libraryKeyMode: LibraryKeyMode;
   onLibraryKeyModeChange: (mode: LibraryKeyMode) => void;
+  /** Try dumping the card on the reader with a chosen Library key source (card or all). */
+  onDumpWithLibraryKeys?: (sourceId: string, options?: { skipDefaults?: boolean }) => void;
+  /** Selectable key sources (whole Library + each card/session) for the HF strip. */
+  libraryKeySources?: LibraryKeySource[];
   onStopOperation?: () => void;
   onHardReset?: () => void;
   theme: Theme;

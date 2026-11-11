@@ -42,6 +42,8 @@ export function RibbonToolbar({
   onCommand,
   libraryKeyMode,
   onLibraryKeyModeChange,
+  onDumpWithLibraryKeys,
+  libraryKeySources,
   onStopOperation,
   onHardReset,
   theme,
@@ -111,6 +113,8 @@ export function RibbonToolbar({
               onCommand: handleCommand,
               libraryKeyMode,
               onLibraryKeyModeChange,
+              onDumpWithLibraryKeys,
+              libraryKeySources,
               commandsEnabled,
               availableTransports,
               selectedTransport,
@@ -175,6 +179,8 @@ type StripContext = {
   onCommand: RibbonToolbarProps["onCommand"];
   libraryKeyMode: RibbonToolbarProps["libraryKeyMode"];
   onLibraryKeyModeChange: RibbonToolbarProps["onLibraryKeyModeChange"];
+  onDumpWithLibraryKeys: RibbonToolbarProps["onDumpWithLibraryKeys"];
+  libraryKeySources: RibbonToolbarProps["libraryKeySources"];
   commandsEnabled: boolean;
   availableTransports: NonNullable<RibbonToolbarProps["availableTransports"]>;
   selectedTransport: RibbonToolbarProps["selectedTransport"];
@@ -224,6 +230,8 @@ function renderStrip(strip: RibbonStripId, ctx: StripContext) {
           onCommand={ctx.onCommand}
           selectedHFCardType={ctx.selectedHFCardType}
           onSelectedHFCardTypeChange={ctx.onSelectedHFCardTypeChange}
+          onDumpWithLibraryKeys={ctx.onDumpWithLibraryKeys}
+          libraryKeySources={ctx.libraryKeySources}
         />
       );
     case "lf":

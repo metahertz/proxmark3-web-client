@@ -16,13 +16,21 @@ import { useCommandHistory } from "@/features/workbench/hooks/useCommandHistory"
 import { useDumpStore } from "@/features/workbench/hooks/useDumpStore";
 import { MainPanelRouter } from "@/features/workbench/components/MainPanelRouter";
 import { type EmscriptenFSLike } from "@/features/workbench/types";
-import { buildKeyDictionary } from "@/components/panels/library/utils";
+import { buildKeyDictionary, groupKeysBySource } from "@/components/panels/library/utils";
+import { toAttackCardType } from "@/features/target/classify";
+import {
+  buildKeyOwnerIndex,
+  formatKeyUsageTable,
+  parseChkKeyTable,
+} from "@/features/keys/libraryDumpReport";
 import {
   acceptsLibraryKeyDictionary,
   appendKeyDictionary,
   hasKeyDictionary,
   libraryKeyDictionaryName,
+  ALL_LIBRARY_KEYS_SOURCE,
   type LibraryKeyMode,
+  type LibraryKeySource,
 } from "@/features/keys/libraryKeyCommands";
 import { vaultStats } from "@/features/vault/vault";
 import {
@@ -864,6 +872,113 @@ function App() {
     [handleCommand, vaultKeys, writeCacheTextFile, wasmState.isReady],
   );
 
+  // Keys grouped by the card/session they came from, so the HF strip can offer
+  // one specific card's keys (e.g. another card from the same installation) as
+  // well as the whole Library. Mirrors the Library panel's grouping.
+  const libraryKeyGroups = useMemo(() => {
+    const dumpMap = new Map(cachedDumps.map((dump) => [dump.id, dump]));
+    return groupKeysBySource(vaultKeys, dumpMap, vaultCards);
+  }, [vaultKeys, cachedDumps, vaultCards]);
+
+  // Picker options for the HF strip: "Entire Library" first, then each source
+  // card/session that has at least one usable key.
+  const libraryKeySources = useMemo<LibraryKeySource[]>(() => {
+    const allCount = buildKeyDictionary(vaultKeys).split("\n").filter(Boolean).length;
+    const sources: LibraryKeySource[] = [
+      { id: ALL_LIBRARY_KEYS_SOURCE, label: "Entire Library", count: allCount },
+    ];
+    for (const group of libraryKeyGroups) {
+      const count = buildKeyDictionary(group.keys).split("\n").filter(Boolean).length;
+      if (count > 0) {
+        sources.push({ id: group.id, label: group.title, sublabel: group.subtitle, count });
+      }
+    }
+    return sources;
+  }, [vaultKeys, libraryKeyGroups]);
+
+  // Try dumping whatever card is on the reader using a chosen set of keys — the
+  // whole Library or one specific card's keys (key reuse across serials, e.g.
+  // another card from the same installation). This is a *check-only* dump: it
+  // runs `hf mf chk` to try the keys and `hf mf dump` to read whatever they
+  // unlock — no nested/darkside cracking — so it is fast and only reads sectors
+  // the reused keys actually open, instead of recovering the card from scratch.
+  const handleDumpWithLibraryKeys = useCallback(
+    async (sourceId: string, options?: { skipDefaults?: boolean }) => {
+      if (!wasmState.isReady) {
+        terminalRef.current?.writeln("\x1b[33mWASM client is still loading...\x1b[0m");
+        return;
+      }
+      const keys =
+        sourceId === ALL_LIBRARY_KEYS_SOURCE
+          ? vaultKeys
+          : (libraryKeyGroups.find((group) => group.id === sourceId)?.keys ?? []);
+      const label =
+        sourceId === ALL_LIBRARY_KEYS_SOURCE
+          ? "the Library (all cards)"
+          : (libraryKeyGroups.find((group) => group.id === sourceId)?.title ?? "selected card");
+      const dictionary = buildKeyDictionary(keys);
+      if (!dictionary) {
+        terminalRef.current?.writeln(
+          "\x1b[33mNo usable keys in that selection — dump or Autopwn a card first to collect some.\x1b[0m",
+        );
+        return;
+      }
+      const path = writeCacheTextFile("hf-mf-library-keys.dic", `${dictionary}\n`);
+      if (!path) {
+        terminalRef.current?.writeln(
+          "\x1b[31mCould not write the key dictionary to the cache filesystem.\x1b[0m",
+        );
+        return;
+      }
+      const size = toAttackCardType(cardTarget.target.classification.size);
+      const skipDefaults = options?.skipDefaults ?? false;
+      const count = dictionary.split("\n").filter(Boolean).length;
+      terminalRef.current?.writeln(
+        `\x1b[36mTrying ${count} key${count === 1 ? "" : "s"} from ${label} against the card (check-only, no cracking${skipDefaults ? ", defaults skipped" : ""}) → ${path}\x1b[0m`,
+      );
+      // chk writes the found keys to hf-mf-<uid>-key.bin, which dump then reads.
+      // Wait for chk to finish before dumping: `hf mf chk` aborts on any pending
+      // input, so queuing the dump command up front lands its text in the
+      // client's stdin mid-check and chk quits with "aborted via keyboard".
+      let chkJob: Awaited<ReturnType<typeof commandCenter.runAndWait>> | null = null;
+      try {
+        chkJob = await commandCenter.runAndWait(
+          `hf mf chk --${size} -f ${path} --dump${skipDefaults ? " --no-default" : ""}`,
+          "library-dump",
+          180_000,
+        );
+      } catch {
+        terminalRef.current?.writeln(
+          "\x1b[33mKey check did not finish cleanly; dumping with whatever keys were found.\x1b[0m",
+        );
+      }
+      await commandCenter.runAndWait(`hf mf dump --${size}`, "library-dump", 120_000).catch(() => {});
+
+      // Summarize which key opened which sector, with provenance, from chk's
+      // own result table (the authoritative source: it flags found vs not).
+      if (chkJob) {
+        const sectors = parseChkKeyTable(chkJob.outputTail);
+        if (sectors.length > 0) {
+          const ownerIndex = buildKeyOwnerIndex(libraryKeyGroups);
+          for (const line of formatKeyUsageTable(sectors, ownerIndex, {
+            sourceLabel: label,
+            skipDefaults,
+          })) {
+            terminalRef.current?.writeln(`\x1b[36m${line}\x1b[0m`);
+          }
+        }
+      }
+    },
+    [
+      commandCenter,
+      vaultKeys,
+      libraryKeyGroups,
+      cardTarget.target.classification.size,
+      writeCacheTextFile,
+      wasmState.isReady,
+    ],
+  );
+
   const handleCacheUse = useCallback(
     (asset: CachedAsset, template: string) => {
       const synced = syncCacheToFS();
@@ -1180,6 +1295,8 @@ function App() {
                 onJsonUpload={handleJsonUpload}
                 libraryKeyMode={libraryKeyMode}
                 onLibraryKeyModeChange={setLibraryKeyMode}
+                onDumpWithLibraryKeys={handleDumpWithLibraryKeys}
+                libraryKeySources={libraryKeySources}
               />
               <MainPanelRouter
                 activeWorkspace={activeWorkspace}
