@@ -31,6 +31,15 @@ export function isWirelessTransport(type: TransportType | null | undefined): boo
   return type === "webbluetooth" || type === "tauri-bluetooth" || type === "tauri-tcp";
 }
 
+/**
+ * BLE transports specifically. The low BLE bandwidth is what makes `lf search`'s
+ * 700k-sample COTAG read stall; USB and Wi-Fi/TCP move those samples fast, so
+ * only BLE needs the buffered LF search.
+ */
+export function isBleTransport(type: TransportType | null | undefined): boolean {
+  return type === "webbluetooth" || type === "tauri-bluetooth";
+}
+
 /** Human-readable label for a transport, preferring the live TransportInfo name. */
 export function getTransportLabel(
   type: TransportType | null | undefined,

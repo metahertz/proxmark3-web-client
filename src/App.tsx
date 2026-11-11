@@ -7,6 +7,7 @@ import { type CachedAsset, type CachedAssetKind } from "@/components/panels/KeyC
 import type { PM3DumpJson } from "@/components/panels/CardMemoryMap";
 import {
   getTransportLabel,
+  isBleTransport,
   loadStoredTcpEndpoint,
   TCP_ENDPOINT_STORAGE_KEY,
   type TransportType,
@@ -56,6 +57,7 @@ import {
   parseLfCredential,
   parseT55xxDetect,
 } from "@/features/lf-tools/lfParse";
+import { issueLfSearch } from "@/features/lf-tools/commands";
 import { parseMagicInfo } from "@/features/magic/detect";
 import {
   DEFAULT_WORKSPACE,
@@ -775,7 +777,7 @@ function App() {
   // Handle command execution. Note what it deliberately no longer does: force
   // the terminal dock open. The activity bar reports the running command from
   // every workspace, so firing one never yanks the view you were using.
-  const handleCommand = useCallback(
+  const runRawCommand = useCallback(
     (cmd: string) => {
       const prepared = prepareLibraryKeyCommand(cmd);
       pushCommand(prepared);
@@ -789,6 +791,29 @@ function App() {
       return commandCenter.run(prepared);
     },
     [commandCenter, prepareLibraryKeyCommand, pushCommand],
+  );
+
+  const handleCommand = useCallback(
+    (cmd: string) => {
+      // Intercept a bare `lf search` from *any* entry point (buttons, palette,
+      // cheat sheet, suggested actions, quick-command bar, typed) and route it
+      // through the transport-aware LF search: always probe Hitag S, and over
+      // BLE use a buffered search so the COTAG 700k-sample read — which stalls
+      // for minutes on the low-bandwidth link — never runs. Explicit variants
+      // like `lf search -u` are left untouched.
+      if (cmd.trim() === "lf search") {
+        const wireless = isBleTransport(wasmState.activeTransportType);
+        if (wireless) {
+          terminalRef.current?.writeln(
+            "\x1b[90mLF search: BLE buffered mode — Hitag S probe + graph-buffer search (COTAG device read skipped)\x1b[0m",
+          );
+        }
+        issueLfSearch((c) => void runRawCommand(c), { wireless });
+        return null;
+      }
+      return runRawCommand(cmd);
+    },
+    [runRawCommand, wasmState.activeTransportType],
   );
 
   // A freshly attached client can refuse commands for a few hundred ms.

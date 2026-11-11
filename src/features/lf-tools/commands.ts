@@ -156,6 +156,36 @@ export function buildLfReadCommand(samples: string): string {
   return `lf read -s ${samples}`;
 }
 
+/** Samples read for a buffered LF search — matches `lf search`'s own internal read. */
+export const LF_SEARCH_SAMPLES = "30000";
+
+/**
+ * LF "search". Always probes Hitag S first (it is not covered by `lf search`
+ * or a graph-buffer search), then runs the main search.
+ *
+ * On USB/Wi-Fi the full `lf search` runs as normal. On BLE it is replaced by a
+ * buffered search — read into the graph buffer, then `lf search -1` (client
+ * offline) — because plain `lf search` does a 700k-sample COTAG realtime read
+ * whenever it finds no known tag, and that stream stalls for a long time over
+ * the low-bandwidth BLE link and cannot be drained by an abort. The buffered
+ * form skips every device read (COTAG, Motorola, EM4x50, Paxton) but still
+ * detects the common buffer-demodulated tags (EM410x, HID, Indala, AWID,
+ * Paradox, Keri, T55xx, …). Commands are queued the same way the LF read/sniff
+ * buttons already chain them.
+ */
+export function issueLfSearch(
+  onCommand: (cmd: string) => void,
+  opts: { wireless?: boolean } = {},
+): void {
+  onCommand("lf hitag hts reader");
+  if (opts.wireless) {
+    onCommand(buildLfReadCommand(LF_SEARCH_SAMPLES));
+    onCommand("lf search -1");
+  } else {
+    onCommand("lf search");
+  }
+}
+
 export function buildLfSniffCommand(samples: string): string {
   return `lf sniff -s ${samples}`;
 }

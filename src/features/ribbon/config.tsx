@@ -305,6 +305,7 @@ export const LF_CARD_TYPES: RibbonCardType[] = [
   { value: "hid", label: "HID" },
   { value: "t55xx", label: "T55xx" },
   { value: "indala", label: "Indala" },
+  { value: "hitag", label: "Hitag" },
   { value: "wiegand", label: "Wiegand" },
 ];
 
@@ -339,6 +340,13 @@ export const LF_CARD_OPERATIONS: Record<string, RibbonAction[]> = {
     { icon: "radio", label: "Read", command: "lf indala read" },
     { icon: "copy", label: "Clone", command: "lf indala clone" },
     { icon: "play", label: "Sim", command: "lf indala sim" },
+  ],
+  hitag: [
+    { icon: "search", label: "Info", command: "lf hitag info" },
+    { icon: "radio", label: "Hitag 2", command: "lf hitag reader" },
+    { icon: "radio", label: "Hitag S", command: "lf hitag hts reader" },
+    { icon: "radio", label: "Hitag U", command: "lf hitag htu reader" },
+    { icon: "download", label: "Dump (H2)", command: "lf hitag dump" },
   ],
   wiegand: [
     { icon: "book", label: "List", command: "wiegand list" },
