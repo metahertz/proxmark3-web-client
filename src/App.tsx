@@ -521,8 +521,16 @@ function App() {
       return null;
     },
     interrupt: () => {
-      if (simulatedModeRef.current) simulatorRef.current?.interrupt();
-      else wasmState.sendBreak();
+      if (simulatedModeRef.current) {
+        simulatorRef.current?.interrupt();
+        return;
+      }
+      // Two abort styles coexist in the client: most commands stop on Ctrl+C,
+      // but streaming reads such as `lf search`'s COTAG stage print "Press
+      // <Enter> to exit" and only stop on a newline. Send both so Stop reliably
+      // ends either — a stray newline at an idle prompt is harmless.
+      wasmState.sendBreak();
+      wasmState.sendInput("\n");
     },
     flushOutput: wasmState.flushOutput,
   });
