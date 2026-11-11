@@ -283,6 +283,12 @@ export function usePm3CommandChannel({
       const connected = await transportManager.connect(selectedType, device);
 
       if (connected) {
+        // The transport fires onConnect from inside its own connect(), before
+        // the manager records it as the active transport — so the onConnect
+        // handler reads a null type. Set it here, once the manager has the
+        // active transport, so activeTransportType reflects the real link
+        // (e.g. "webbluetooth" rather than null, which the LF search relies on).
+        setActiveTransportType(transportManager.activeTransportType);
         pendingDevicePathRef.current = getDevicePath(selectedType);
         await wait(selectedType === "webserial" ? 500 : 100);
         if (isReadyRef.current) {
@@ -296,7 +302,7 @@ export function usePm3CommandChannel({
 
       return connected;
     },
-    [flushPendingDeviceConnect, isReadyRef, transportManager],
+    [flushPendingDeviceConnect, isReadyRef, transportManager, setActiveTransportType],
   );
 
   const disconnectDevice = useCallback(async (): Promise<void> => {
